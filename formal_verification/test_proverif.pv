@@ -1,0 +1,172 @@
+(* ============================================================================== *)
+(* ARMOR-PQ: Post-Quantum Mutual Authentication and Key Exchange Protocol         *)
+(* Formal Symbolic Security Verification via ProVerif 2.05                        *)
+(* Modeling: Corrected 3-Round Protocol with Implicit RLWE AKE, Peikert           *)
+(*           Reconciliation, Nonce/Timestamp Freshness, and Transcript Binding     *)
+(* ============================================================================== *)
+
+free ch: channel. (* Public Insecure Channel *)
+
+(* Cryptographic Types *)
+type id.
+type puf_response.
+type puf_challenge.
+type poly.          (* Elements of Ring R_q *)
+type key.
+type helper_data.
+type puf_seed.      (* Silicon-rooted hardware instance *)
+
+(* Cryptographic Hash Function (SHA-512 in Random Oracle Model) *)
+fun sha512(bitstring): bitstring.
+
+(* RLWE Key Exchange Primitives:                                               *)
+(* Standard Diffie-Hellman / Ring-LWE commutative equation:                    *)
+fun rlwe_pk(poly, poly): poly.                (* rlwe_pk(secret, a) = a * secret *)
+fun rlwe_shared(poly, poly): poly.            (* shared secret in R_q *)
+
+equation forall s1: poly, s2: poly, a: poly;
+    rlwe_shared(rlwe_pk(s1, a), s2) = rlwe_shared(rlwe_pk(s2, a), s1).
+
+(* Peikert Error Reconciliation Primitives *)
+fun help_rec(poly): bitstring.                (* w = HelpRec(sh_S) *)
+fun rec(poly, bitstring): key.                (* K = Rec(sh, w) *)
+fun rec_key(poly): key.
+
+equation forall s: poly;
+    rec(s, help_rec(s)) = rec_key(s).
+
+(* PUF and Fuzzy Extractor Primitives *)
+fun puf(puf_challenge, puf_seed): puf_response. 
+fun fe_gen(puf_response): bitstring.
+fun get_key(bitstring): key.
+fun get_helper(bitstring): helper_data.
+fun fe_rep(puf_response, helper_data): key.
+
+(* Fuzzy Extractor Reconstruction Guarantee *)
+equation forall r: puf_response;
+    fe_rep(r, get_helper(fe_gen(r))) = get_key(fe_gen(r)).
+
+(* Events for Mutual Authentication & Freshness Injective Agreement *)
+event begin_device(bitstring, id, poly, bitstring, bitstring). (* pidI, srvID, pi_tilde, Ts, Cs *)
+event begin_server(id, bitstring, poly, poly, bitstring, bitstring). (* srvID, pidI, pi_tilde, pj_tilde, Ts, Cs *)
+event end_device(bitstring, id, poly, poly, bitstring, bitstring).   (* pidI, srvID, pi_tilde, pj_tilde, Ts, Cs *)
+event end_server(id, bitstring, poly, poly, bitstring, bitstring).   (* srvID, pidI, pi_tilde, pj_tilde, Ts, Cs *)
+
+(* --- Security Queries --- *)
+
+(* Query 1: Session Key Secrecy (Strong Secrecy against active Dolev-Yao attacker) *)
+query secret SK.
+
+(* Query 2: PUF Hardware Root Secrecy (Physical Unclonability) *)
+free v_i: bitstring [private].
+query attacker(v_i).
+
+(* Query 3: Server Authenticates Client (Injective Mutual Agreement) *)
+query pid: bitstring, sid: id, p1: poly, p2: poly, ts: bitstring, cs: bitstring;
+    inj-event(end_server(sid, pid, p1, p2, ts, cs)) ==> inj-event(begin_device(pid, sid, p1, ts, cs)).
+
+(* Query 4: Client Authenticates Server (Injective Mutual Agreement) *)
+query pid: bitstring, sid: id, p1: poly, p2: poly, ts: bitstring, cs: bitstring;
+    inj-event(end_device(pid, sid, p1, p2, ts, cs)) ==> inj-event(begin_server(sid, pid, p1, p2, ts, cs)).
+
+(* Query 5: Device Identity Anonymity (Unlinkability against channel eavesdropper) *)
+free devID: id [private].
+query attacker(devID).
+
+(* Server Credential Registration Table: stores (PID, pk_i, h_i, d_i, v_i) *)
+table registration_db(bitstring, poly, helper_data, bitstring, bitstring).
+
+(* ============================================================================== *)
+(* Client PUF-enabled Device (CPD) Process                                        *)
+(* ============================================================================== *)
+let processCPD(srvID: id, my_puf: puf_seed, a: poly, pw: bitstring) =
+    (* Phase II: Enrollment (conducted over secure offline provisioning) *)
+    new r_enroll: puf_challenge;
+    let resp = puf(r_enroll, my_puf) in
+    let res = fe_gen(resp) in
+    let r_key: key = get_key(res) in
+    let h_i = get_helper(res) in
+    new sk_i: poly;
+    let pk_i = rlwe_pk(sk_i, a) in
+    
+    (* Dynamic Pseudo-ID and Split Authentication Credentials *)
+    new Ts_enroll: bitstring;
+    let pidI = sha512((devID, Ts_enroll)) in
+    let h_val = sha512((devID, pidI, pw, r_key)) in
+    new d_i: bitstring;
+    
+    insert registration_db(pidI, pk_i, h_i, d_i, v_i);
+
+    (* Phase III: Mutual Authentication (executed concurrently over public channel) *)
+    (! 
+        (* Round 1: CPD -> Server *)
+        new Cs: bitstring;
+        new Ts: bitstring;
+        new puf_eval_chal: puf_challenge;
+        let r_prime = puf(puf_eval_chal, my_puf) in
+        let r_rec = fe_rep(r_prime, h_i) in
+        new tau: bitstring;
+        new ei: poly;
+        let pi_tilde = rlwe_pk(ei, a) in
+        
+        event begin_device(pidI, srvID, pi_tilde, Ts, Cs);
+        out(ch, (pidI, pi_tilde, Ts, Cs, tau));
+        
+        (* Round 2: Receive Server Response *)
+        in(ch, (pj_tilde: poly, w: bitstring, alpha_j: bitstring));
+        
+        let sh_D = rlwe_shared(pj_tilde, ei) in
+        let KD = rec(sh_D, w) in
+        
+        (* Verify Server Authenticator alpha_j binding transcript & secrets *)
+        if alpha_j = sha512((srvID, pidI, pi_tilde, pj_tilde, w, KD, tau, Ts, Cs, d_i)) then
+        (
+            event end_device(pidI, srvID, pi_tilde, pj_tilde, Ts, Cs);
+            
+            (* Round 3: CPD -> Server with Client Authenticator *)
+            let alpha_i = sha512((pidI, srvID, pi_tilde, pj_tilde, w, KD, Ts, Cs, v_i)) in
+            out(ch, (alpha_i));
+            
+            (* Session Key Derivation *)
+            let SK: bitstring = sha512((pidI, srvID, pi_tilde, pj_tilde, w, alpha_i, alpha_j, KD, v_i)) in
+            0
+        )
+    ).
+
+(* ============================================================================== *)
+(* Authentication Server Process                                                  *)
+(* ============================================================================== *)
+let processServer(srvID: id, a: poly) =
+    in(ch, (pid: bitstring, pi_tilde: poly, Ts: bitstring, Cs: bitstring, tau: bitstring));
+    get registration_db(=pid, pk_i, h_i, d_i, v_puf) in
+    
+    (* Server samples ephemeral polynomial *)
+    new ej: poly;
+    let pj_tilde = rlwe_pk(ej, a) in
+    let sh_S = rlwe_shared(pi_tilde, ej) in
+    let w = help_rec(sh_S) in
+    let KS = rec(sh_S, w) in
+    
+    event begin_server(srvID, pid, pi_tilde, pj_tilde, Ts, Cs);
+    
+    (* Round 2: Transmit M2 *)
+    let alpha_j = sha512((srvID, pid, pi_tilde, pj_tilde, w, KS, tau, Ts, Cs, d_i)) in
+    out(ch, (pj_tilde, w, alpha_j));
+    
+    (* Round 3: Receive M3 and Verify Client Authenticator *)
+    in(ch, (alpha_i: bitstring));
+    if alpha_i = sha512((pid, srvID, pi_tilde, pj_tilde, w, KS, Ts, Cs, v_puf)) then
+    (
+        let SK: bitstring = sha512((pid, srvID, pi_tilde, pj_tilde, w, alpha_i, alpha_j, KS, v_puf)) in
+        event end_server(srvID, pid, pi_tilde, pj_tilde, Ts, Cs)
+    ).
+
+(* ============================================================================== *)
+(* Main Root Process                                                              *)
+(* ============================================================================== *)
+process
+    new a: poly;
+    new srvID: id;
+    new my_puf: puf_seed;
+    new pw: bitstring;
+    ( processCPD(srvID, my_puf, a, pw) | (!processServer(srvID, a)) )

@@ -1,0 +1,25 @@
+# Binaries and object files
+*.o
+*.a
+*.so
+rlwe_puf_auth_demo
+test_demo
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+pqenv/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/

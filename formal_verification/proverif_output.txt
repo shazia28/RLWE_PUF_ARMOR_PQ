@@ -1,0 +1,201 @@
+Linear part:
+rlwe_shared(rlwe_pk(s1,a),s2) = rlwe_shared(rlwe_pk(s2,a),s1)
+Completing equations...
+Completed equations:
+rlwe_shared(rlwe_pk(s1,a),s2) = rlwe_shared(rlwe_pk(s2,a),s1)
+Convergent part:
+rec(s,help_rec(s)) = rec_key(s)
+fe_rep(r,get_helper(fe_gen(r))) = get_key(fe_gen(r))
+Completing equations...
+Completed equations:
+fe_rep(r,get_helper(fe_gen(r))) = get_key(fe_gen(r))
+rec(s,help_rec(s)) = rec_key(s)
+Process 0 (that is, the initial process):
+{1}new a: poly;
+{2}new srvID: id;
+{3}new my_puf: puf_seed;
+{4}new pw: bitstring;
+(
+    {5}let srvID_1: id = srvID in
+    {6}let my_puf_1: puf_seed = my_puf in
+    {7}let a_1: poly = a in
+    {8}let pw_1: bitstring = pw in
+    {9}new r_enroll: puf_challenge;
+    {10}let resp: puf_response = puf(r_enroll,my_puf_1) in
+    {11}let res: bitstring = fe_gen(resp) in
+    {12}let r_key: key = get_key(res) in
+    {13}let h_i: helper_data = get_helper(res) in
+    {14}new sk_i: poly;
+    {15}let pk_i: poly = rlwe_pk(sk_i,a_1) in
+    {16}new Ts_enroll: bitstring;
+    {17}let pidI: bitstring = sha512((devID,Ts_enroll)) in
+    {18}let h_val: bitstring = sha512((devID,pidI,pw_1,r_key)) in
+    {19}new d_i: bitstring;
+    {20}insert registration_db(pidI,pk_i,h_i,d_i,v_i);
+    {21}!
+    {22}new Cs: bitstring;
+    {23}new Ts: bitstring;
+    {24}new puf_eval_chal: puf_challenge;
+    {25}let r_prime: puf_response = puf(puf_eval_chal,my_puf_1) in
+    {26}let r_rec: key = fe_rep(r_prime,h_i) in
+    {27}new tau: bitstring;
+    {28}new ei: poly;
+    {29}let pi_tilde: poly = rlwe_pk(ei,a_1) in
+    {30}event begin_device(pidI,srvID_1,pi_tilde,Ts,Cs);
+    {31}out(ch, (pidI,pi_tilde,Ts,Cs,tau));
+    {32}in(ch, (pj_tilde: poly,w: bitstring,alpha_j: bitstring));
+    {33}let sh_D: poly = rlwe_shared(pj_tilde,ei) in
+    {34}let KD: key = rec(sh_D,w) in
+    {35}if (alpha_j = sha512((srvID_1,pidI,pi_tilde,pj_tilde,w,KD,tau,Ts,Cs,d_i))) then
+    {36}event end_device(pidI,srvID_1,pi_tilde,pj_tilde,Ts,Cs);
+    {37}let alpha_i: bitstring = sha512((pidI,srvID_1,pi_tilde,pj_tilde,w,KD,Ts,Cs,v_i)) in
+    {38}out(ch, alpha_i);
+    {39}let SK: bitstring = sha512((pidI,srvID_1,pi_tilde,pj_tilde,w,alpha_i,alpha_j,KD,v_i)) in
+    0
+) | (
+    {40}!
+    {41}let srvID_2: id = srvID in
+    {42}let a_2: poly = a in
+    {43}in(ch, (pid: bitstring,pi_tilde_1: poly,Ts_1: bitstring,Cs_1: bitstring,tau_1: bitstring));
+    {56}get registration_db(=pid,pk_i_1: poly,h_i_1: helper_data,d_i_1: bitstring,v_puf: bitstring) in
+    {44}new ej: poly;
+    {45}let pj_tilde_1: poly = rlwe_pk(ej,a_2) in
+    {46}let sh_S: poly = rlwe_shared(pi_tilde_1,ej) in
+    {47}let w_1: bitstring = help_rec(sh_S) in
+    {48}let KS: key = rec(sh_S,w_1) in
+    {49}event begin_server(srvID_2,pid,pi_tilde_1,pj_tilde_1,Ts_1,Cs_1);
+    {50}let alpha_j_1: bitstring = sha512((srvID_2,pid,pi_tilde_1,pj_tilde_1,w_1,KS,tau_1,Ts_1,Cs_1,d_i_1)) in
+    {51}out(ch, (pj_tilde_1,w_1,alpha_j_1));
+    {52}in(ch, alpha_i_1: bitstring);
+    {53}if (alpha_i_1 = sha512((pid,srvID_2,pi_tilde_1,pj_tilde_1,w_1,KS,Ts_1,Cs_1,v_puf))) then
+    {54}let SK_1: bitstring = sha512((pid,srvID_2,pi_tilde_1,pj_tilde_1,w_1,alpha_i_1,alpha_j_1,KS,v_puf)) in
+    {55}event end_server(srvID_2,pid,pi_tilde_1,pj_tilde_1,Ts_1,Cs_1)
+)
+
+File "test_proverif.pv", line 65, characters 23-25:
+Warning: identifier sid rebound.
+File "test_proverif.pv", line 69, characters 23-25:
+Warning: identifier sid rebound.
+--  Process 1 (that is, process 0, encoded for secret SK_1,SK, with let moved downwards):
+{1}new a: poly;
+{2}new srvID: id;
+{3}new my_puf: puf_seed;
+{4}new pw: bitstring;
+(
+    {9}new r_enroll: puf_challenge;
+    {14}new sk_i: poly;
+    {16}new Ts_enroll: bitstring;
+    {19}new d_i: bitstring;
+    {17}let pidI: bitstring = sha512((devID,Ts_enroll)) in
+    {7}let a_1: poly = a in
+    {15}let pk_i: poly = rlwe_pk(sk_i,a_1) in
+    {6}let my_puf_1: puf_seed = my_puf in
+    {10}let resp: puf_response = puf(r_enroll,my_puf_1) in
+    {11}let res: bitstring = fe_gen(resp) in
+    {13}let h_i: helper_data = get_helper(res) in
+    {20}insert registration_db(pidI,pk_i,h_i,d_i,v_i);
+    {21}!
+    {22}new Cs: bitstring;
+    {23}new Ts: bitstring;
+    {24}new puf_eval_chal: puf_challenge;
+    {27}new tau: bitstring;
+    {28}new ei: poly;
+    {29}let pi_tilde: poly = rlwe_pk(ei,a_1) in
+    {5}let srvID_1: id = srvID in
+    {30}event begin_device(pidI,srvID_1,pi_tilde,Ts,Cs);
+    {31}out(ch, (pidI,pi_tilde,Ts,Cs,tau));
+    {32}in(ch, (pj_tilde: poly,w: bitstring,alpha_j: bitstring));
+    {33}let sh_D: poly = rlwe_shared(pj_tilde,ei) in
+    {34}let KD: key = rec(sh_D,w) in
+    {35}if (alpha_j = sha512((srvID_1,pidI,pi_tilde,pj_tilde,w,KD,tau,Ts,Cs,d_i))) then
+    {36}event end_device(pidI,srvID_1,pi_tilde,pj_tilde,Ts,Cs);
+    {37}let alpha_i: bitstring = sha512((pidI,srvID_1,pi_tilde,pj_tilde,w,KD,Ts,Cs,v_i)) in
+    {38}out(ch, alpha_i);
+    {39}let SK: bitstring = sha512((pidI,srvID_1,pi_tilde,pj_tilde,w,alpha_i,alpha_j,KD,v_i)) in
+    {40}event SK_contains(SK)
+) | (
+    {41}!
+    {44}in(ch, (pid: bitstring,pi_tilde_1: poly,Ts_1: bitstring,Cs_1: bitstring,tau_1: bitstring));
+    {45}get registration_db(=pid,pk_i_1: poly,h_i_1: helper_data,d_i_1: bitstring,v_puf: bitstring) in
+    {46}new ej: poly;
+    {43}let a_2: poly = a in
+    {47}let pj_tilde_1: poly = rlwe_pk(ej,a_2) in
+    {42}let srvID_2: id = srvID in
+    {51}event begin_server(srvID_2,pid,pi_tilde_1,pj_tilde_1,Ts_1,Cs_1);
+    {48}let sh_S: poly = rlwe_shared(pi_tilde_1,ej) in
+    {49}let w_1: bitstring = help_rec(sh_S) in
+    {50}let KS: key = rec(sh_S,w_1) in
+    {52}let alpha_j_1: bitstring = sha512((srvID_2,pid,pi_tilde_1,pj_tilde_1,w_1,KS,tau_1,Ts_1,Cs_1,d_i_1)) in
+    {53}out(ch, (pj_tilde_1,w_1,alpha_j_1));
+    {54}in(ch, alpha_i_1: bitstring);
+    {55}if (alpha_i_1 = sha512((pid,srvID_2,pi_tilde_1,pj_tilde_1,w_1,KS,Ts_1,Cs_1,v_puf))) then
+    {56}let SK_1: bitstring = sha512((pid,srvID_2,pi_tilde_1,pj_tilde_1,w_1,alpha_i_1,alpha_j_1,KS,v_puf)) in
+    {57}event SK_contains(SK_1);
+    {58}event end_server(srvID_2,pid,pi_tilde_1,pj_tilde_1,Ts_1,Cs_1)
+)
+
+-- Query secret SK_1,SK encoded as not (event(SK_contains(v)) && attacker(v)) in process 1.
+Translating the process into Horn clauses...
+Completing...
+200 rules inserted. Base: 145 rules (47 with conclusion selected). Queue: 46 rules.
+Starting query secret SK_1,SK
+RESULT secret SK_1,SK is true.
+-- Query not attacker(v_i[]) in process 1.
+Translating the process into Horn clauses...
+Completing...
+Starting query not attacker(v_i[])
+RESULT not attacker(v_i[]) is true.
+-- Query inj-event(end_server(sid_1,pid_1,p1,p2,ts,cs)) ==> inj-event(begin_device(pid_1,sid_1,p1,ts,cs)) in process 1.
+Translating the process into Horn clauses...
+Completing...
+200 rules inserted. Base: 166 rules (47 with conclusion selected). Queue: 26 rules.
+Starting query inj-event(end_server(sid_1,pid_1,p1,p2,ts,cs)) ==> inj-event(begin_device(pid_1,sid_1,p1,ts,cs))
+goal reachable: b-event(@p_act(@occ32_1,(rlwe_pk(ej_1,a[]),help_rec(rlwe_shared(rlwe_pk(ej_1,a[]),ei_1)),sha512((srvID[],sha512((devID[],Ts_enroll[])),rlwe_pk(ei_1,a[]),rlwe_pk(ej_1,a[]),help_rec(rlwe_shared(rlwe_pk(ej_1,a[]),ei_1)),rec_key(rlwe_shared(rlwe_pk(ej_1,a[]),ei_1)),tau_2,Ts_2,Cs_2,d_i[]))))) && b-inj-event(begin_device(sha512((devID[],Ts_enroll[])),srvID[],rlwe_pk(ei_1,a[]),Ts_2,Cs_2),@occ30_1) -> inj-event(end_server(srvID[],sha512((devID[],Ts_enroll[])),rlwe_pk(ei_1,a[]),rlwe_pk(ej_1,a[]),Ts_2,Cs_2),@occ58_1)
+The 1st, 2nd hypotheses occur strictly before the conclusion.
+Abbreviations:
+ei_1 = ei[!1 = @sid]
+tau_2 = tau[!1 = @sid]
+Cs_2 = Cs[!1 = @sid]
+Ts_2 = Ts[!1 = @sid]
+ej_1 = ej[v_puf = v_i[],d_i_1 = d_i[],h_i_1 = get_helper(fe_gen(puf(r_enroll[],my_puf[]))),pk_i_1 = rlwe_pk(sk_i[],a[]),tau_1 = tau_2,Cs_1 = Cs_2,Ts_1 = Ts_2,pi_tilde_1 = rlwe_pk(ei_1,a[]),pid = sha512((devID[],Ts_enroll[])),!1 = @sid_1]
+@occ58_1 = @occ58[alpha_i_1 = sha512((sha512((devID[],Ts_enroll[])),srvID[],rlwe_pk(ei_1,a[]),rlwe_pk(ej_1,a[]),help_rec(rlwe_shared(rlwe_pk(ej_1,a[]),ei_1)),rec_key(rlwe_shared(rlwe_pk(ej_1,a[]),ei_1)),Ts_2,Cs_2,v_i[])),v_puf = v_i[],d_i_1 = d_i[],h_i_1 = get_helper(fe_gen(puf(r_enroll[],my_puf[]))),pk_i_1 = rlwe_pk(sk_i[],a[]),tau_1 = tau_2,Cs_1 = Cs_2,Ts_1 = Ts_2,pi_tilde_1 = rlwe_pk(ei_1,a[]),pid = sha512((devID[],Ts_enroll[])),!1 = @sid_1]
+@occ32_1 = @occ32[!1 = @sid]
+@occ30_1 = @occ30[!1 = @sid]
+RESULT inj-event(end_server(sid_1,pid_1,p1,p2,ts,cs)) ==> inj-event(begin_device(pid_1,sid_1,p1,ts,cs)) is true.
+-- Query inj-event(end_device(pid_1,sid_1,p1,p2,ts,cs)) ==> inj-event(begin_server(sid_1,pid_1,p1,p2,ts,cs)) in process 1.
+Translating the process into Horn clauses...
+Completing...
+200 rules inserted. Base: 146 rules (47 with conclusion selected). Queue: 38 rules.
+Starting query inj-event(end_device(pid_1,sid_1,p1,p2,ts,cs)) ==> inj-event(begin_server(sid_1,pid_1,p1,p2,ts,cs))
+goal reachable: b-inj-event(begin_server(srvID[],sha512((devID[],Ts_enroll[])),rlwe_pk(ei_1,a[]),rlwe_pk(ej_1,a[]),Ts_2,Cs_2),@occ51_1) -> inj-event(end_device(sha512((devID[],Ts_enroll[])),srvID[],rlwe_pk(ei_1,a[]),rlwe_pk(ej_1,a[]),Ts_2,Cs_2),@occ36_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+ei_1 = ei[!1 = @sid]
+tau_2 = tau[!1 = @sid]
+Cs_2 = Cs[!1 = @sid]
+Ts_2 = Ts[!1 = @sid]
+ej_1 = ej[v_puf = v_i[],d_i_1 = d_i[],h_i_1 = get_helper(fe_gen(puf(r_enroll[],my_puf[]))),pk_i_1 = rlwe_pk(sk_i[],a[]),tau_1 = tau_2,Cs_1 = Cs_2,Ts_1 = Ts_2,pi_tilde_1 = rlwe_pk(ei_1,a[]),pid = sha512((devID[],Ts_enroll[])),!1 = @sid_1]
+@occ36_1 = @occ36[alpha_j = sha512((srvID[],sha512((devID[],Ts_enroll[])),rlwe_pk(ei_1,a[]),rlwe_pk(ej_1,a[]),help_rec(rlwe_shared(rlwe_pk(ej_1,a[]),ei_1)),rec_key(rlwe_shared(rlwe_pk(ej_1,a[]),ei_1)),tau_2,Ts_2,Cs_2,d_i[])),w = help_rec(rlwe_shared(rlwe_pk(ej_1,a[]),ei_1)),pj_tilde = rlwe_pk(ej_1,a[]),!1 = @sid]
+@occ51_1 = @occ51[v_puf = v_i[],d_i_1 = d_i[],h_i_1 = get_helper(fe_gen(puf(r_enroll[],my_puf[]))),pk_i_1 = rlwe_pk(sk_i[],a[]),tau_1 = tau_2,Cs_1 = Cs_2,Ts_1 = Ts_2,pi_tilde_1 = rlwe_pk(ei_1,a[]),pid = sha512((devID[],Ts_enroll[])),!1 = @sid_1]
+RESULT inj-event(end_device(pid_1,sid_1,p1,p2,ts,cs)) ==> inj-event(begin_server(sid_1,pid_1,p1,p2,ts,cs)) is true.
+-- Query not attacker(devID[]) in process 1.
+Translating the process into Horn clauses...
+Completing...
+Starting query not attacker(devID[])
+RESULT not attacker(devID[]) is true.
+
+--------------------------------------------------------------
+Verification summary:
+
+Query secret SK_1,SK is true.
+
+Query not attacker(v_i[]) is true.
+
+Query inj-event(end_server(sid_1,pid_1,p1,p2,ts,cs)) ==> inj-event(begin_device(pid_1,sid_1,p1,ts,cs)) is true.
+
+Query inj-event(end_device(pid_1,sid_1,p1,p2,ts,cs)) ==> inj-event(begin_server(sid_1,pid_1,p1,p2,ts,cs)) is true.
+
+Query not attacker(devID[]) is true.
+
+--------------------------------------------------------------
+
