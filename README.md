@@ -23,6 +23,7 @@ The proliferation of the Internet of Medical Things (IoMT) exposes medical devic
 - **Peikert Error Reconciliation:** Replaces naive rounding with 1-bit cross-rounding hints ($w \in \{0,1\}^{512}$, $64$ bytes), guaranteeing robust shared key agreement under RLWE noise.
 - **Noise-Resilient Fuzzy Extractor:** Employs an optimal $[15, 1, 15]$ repetition code with majority-logic decoding capable of tolerating bit-error rates (BER) up to $10\%$, ensuring whole-key recovery success rate $P_{\text{key}} \ge 99.14\%$.
 - **Triple-Tier Security Validation:** Formally proved under the Random Oracle Model (ROM), verified symbolically under the Dolev–Yao model using **ProVerif 2.05** (zero counterexamples), and concretely quantified with the **SageMath LWE Estimator** ($\approx 150$ bits post-quantum security, exceeding NIST Level 1).
+- **Execution Efficiency:** Completes mutual authentication in **$0.785$ ms** ($784.994\ \mu\text{s}$) under pipelined execution ($1.306$ ms in full interactive cold-start mode) across the Raspberry Pi 400 (CPD) and Intel Xeon w3-2435 (Server) evaluation platforms.
 
 ---
 
@@ -121,6 +122,8 @@ The full verification log is available in [`formal_verification/proverif_output.
 | Peak SRAM | --- | **$\approx 4.8$ KB** | $1{,}024$ B NTT + $1{,}024$ B $e_i$ + $1{,}024$ B $sk_i$ + $512$ B PUF + I/O |
 | ROM Twiddle Tables | $M_{\text{twiddle}}$ | **$2.0$ KB** | Flash-resident `const PROGMEM` constants |
 | PUF ECC | $[N, K, D]$ | $[15, 1, 15]$ | Repetition code with majority-logic decoding ($t=7$) |
+| Pipelined Latency | $T_{\text{CPD}} + T_S$ | **0.785 ms** | $699.024\ \mu$s (Raspberry Pi 400) + $85.970\ \mu$s (Intel Xeon w3-2435) |
+| Cold-Start Latency | $T_{\text{CPD}} + T_S$ | **1.306 ms** | $1{,}050.798\ \mu$s (CPD) + $255.354\ \mu$s (Server), strictly on-demand |
 | Post-Quantum Security | Core-SVP | **$\approx 150$ bits** | BDD $\beta=566$ under quantum sieving ($2^{0.265\beta}$) |
 
 ---
