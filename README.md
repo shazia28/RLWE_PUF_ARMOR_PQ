@@ -107,6 +107,10 @@ proverif formal_verification/test_proverif.pv
 
 The full verification log is available in [`formal_verification/proverif_output.txt`](formal_verification/proverif_output.txt).
 
+<p align="center">
+  <img src="formal_verification/proverif_results.png" alt="ProVerif 2.05 Verification Summary" width="90%">
+</p>
+
 ---
 
 ## Parameters Summary
