@@ -113,18 +113,18 @@ The full verification log is available in [`formal_verification/proverif_output.
 
 | Parameter | Notation | Value | Rationale |
 | :--- | :---: | :---: | :--- |
-| Ring Dimension | $n$ | $512$ | Negacyclic ring $\mathcal{R}_q = \mathbb{Z}_q[x]/\langle x^n + 1 \rangle$ |
-| Modulus | $q$ | $12289$ | Prime $q \equiv 1 \pmod{1024}$, admits NTT primitive roots |
-| Error Width | $\sigma$ | $3.2$ | Discrete Gaussian $\chi_\sigma$ ($\alpha \approx 0.0006527$) |
-| Packing Width | $\lceil \log_2 q \rceil$ | $14$ bits | Over-the-air polynomial transmission ($896$ B / poly) |
-| Active Word Size | --- | $16$ bits | In-memory `int16_t` runtime storage ($1{,}024$ B / poly) |
-| Total Communication | $|\mathcal{M}_1| + |\mathcal{M}_2| + |\mathcal{M}_3|$ | **2,152 bytes** | $1{,}064$ B ($\mathcal{M}_1$) + $1{,}024$ B ($\mathcal{M}_2$) + $64$ B ($\mathcal{M}_3$) |
-| Peak SRAM | --- | **$\approx 4.8$ KB** | $1{,}024$ B NTT + $1{,}024$ B $e_i$ + $1{,}024$ B $sk_i$ + $512$ B PUF + I/O |
-| ROM Twiddle Tables | $M_{\text{twiddle}}$ | **$2.0$ KB** | Flash-resident `const PROGMEM` constants |
-| PUF ECC | $[N, K, D]$ | $[15, 1, 15]$ | Repetition code with majority-logic decoding ($t=7$) |
-| Pipelined Latency | $T_{\text{CPD}} + T_S$ | **0.785 ms** | $699.024\ \mu$s (Raspberry Pi 400) + $85.970\ \mu$s (Intel Xeon w3-2435) |
-| Cold-Start Latency | $T_{\text{CPD}} + T_S$ | **1.306 ms** | $1{,}050.798\ \mu$s (CPD) + $255.354\ \mu$s (Server), strictly on-demand |
-| Post-Quantum Security | Core-SVP | **$\approx 150$ bits** | BDD $\beta=566$ under quantum sieving ($2^{0.265\beta}$) |
+| Ring Dimension | *n* | 512 | Negacyclic ring *R_q* = ℤ_q[*x*] / ⟨*x*ⁿ + 1⟩ |
+| Modulus | *q* | 12289 | Prime *q* ≡ 1 (mod 1024), admits NTT primitive roots |
+| Error Width | *σ* | 3.2 | Discrete Gaussian *χ_σ* (*α* ≈ 0.0006527) |
+| Packing Width | ⌈log₂ *q*⌉ | 14 bits | Over-the-air polynomial transmission (896 B / poly) |
+| Active Word Size | --- | 16 bits | In-memory `int16_t` runtime storage (1,024 B / poly) |
+| Total Communication | \|M₁\| + \|M₂\| + \|M₃\| | **2,152 bytes** | 1,064 B (M₁) + 1,024 B (M₂) + 64 B (M₃) |
+| Peak SRAM | --- | **≈ 4.8 KB** | 1,024 B NTT + 1,024 B *e_i* + 1,024 B *sk_i* + 512 B PUF + I/O |
+| ROM Twiddle Tables | *M*_twiddle | **2.0 KB** | Flash-resident `const PROGMEM` constants |
+| PUF ECC | [*N*, *K*, *D*] | [15, 1, 15] | Repetition code with majority-logic decoding (*t* = 7) |
+| Pipelined Latency | *T*_CPD + *T*_S | **0.785 ms** | 699.024 µs (Raspberry Pi 400) + 85.970 µs (Intel Xeon w3-2435) |
+| Cold-Start Latency | *T*_CPD + *T*_S | **1.306 ms** | 1,050.798 µs (CPD) + 255.354 µs (Server), strictly on-demand |
+| Post-Quantum Security | Core-SVP | **≈ 150 bits** | BDD *β* = 566 under quantum sieving (2^0.265β) |
 
 ---
 
