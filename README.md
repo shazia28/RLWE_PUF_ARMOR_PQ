@@ -8,8 +8,6 @@
 Official implementation, empirical simulation testbeds, and formal verification models for the research paper:
 
 > **ARMOR-PQ: A Lightweight Memory-Efficient Lattice-Based Mutual Authentication Scheme for the Internet of Medical Things**  
-> *Shazia Tazeen and R. Padmavathy*  
-> Department of Computer Science and Engineering, National Institute of Technology Warangal, Telangana, India.  
 > Submitted to *Scientific Reports* (Nature Portfolio).
 
 ---
