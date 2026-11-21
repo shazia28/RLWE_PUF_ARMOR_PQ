@@ -110,10 +110,9 @@ void simulate_puf_operations(PUF_TimingMetrics* timing) {
     polynomial_init(&server_pk); polynomial_init(&ta_pk);
     polynomial_uniform(&server_pk); polynomial_uniform(&ta_pk);
     PUFAuthMessage auth_msg;
-    int c_i[RLWE_N];
     for (r = 0; r < W + N; r++) {
         start = get_time_us();
-        puf_smart_device_initiate_authentication(&device, &server_pk, &ta_pk, &auth_msg, c_i);
+        puf_smart_device_initiate_authentication(&device, &server_pk, &ta_pk, &auth_msg, NULL);
         end = get_time_us();
         if (r >= W) samples[r - W] = (uint64_t)(end - start);
     }

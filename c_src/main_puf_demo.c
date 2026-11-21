@@ -65,11 +65,30 @@ void demo_rlwe_puf_authentication() {
     puf_system_initialization(&ta);
     printf("   PUF-Enhanced Trusted Authority initialized successfully.\n\n");
     
-    // [Rest of your existing demo code...]
-    // Step 2-15: The complete authentication flow
-    printf("2. [Authentication steps 2-15 would execute here...]\n");
-    printf("   ... Complete authentication protocol ...\n\n");
-    
+    // Step 2-15: Execute the complete 3-round mutual authentication protocol
+    PUFSmartDevice device;
+    PUFEdgeServer server;
+    char dev_id_out[MAX_ID_LENGTH], pseudo_id_out[MAX_ID_LENGTH], pw_hash_out[MAX_HASH_LENGTH];
+    char d_i_out[MAX_HASH_LENGTH], v_i_out[MAX_HASH_LENGTH];
+    Polynomial dev_pk;
+
+    puf_smart_device_init(&device, "IoMT_Sensor_01", "biomed_secret");
+    puf_smart_device_enroll_puf(&device);
+    puf_smart_device_prepare_registration(&device, dev_id_out, pseudo_id_out, &dev_pk, pw_hash_out);
+    puf_register_device(&ta, &device, "biomed_secret", d_i_out, v_i_out);
+    puf_smart_device_store_parameters(&device, d_i_out, v_i_out);
+    puf_edge_server_init(&server, "AS_Gateway_01");
+
+    printf("2. Executing 3-round ARMOR-PQ mutual authentication...\n");
+    printf("   sizeof(Polynomial) = %zu bytes (512 x int16_t)\n", sizeof(Polynomial));
+    printf("   14-bit Packed Polynomial = %d bytes\n", RLWE_PACKED_BYTES);
+    int auth_ok = puf_perform_mutual_auth(&device, &server, &ta);
+    printf("   Mutual Authentication Result: %s\n\n", auth_ok ? "VERIFIED (SUCCESS)" : "FAILED");
+
+    puf_smart_device_cleanup(&device);
+    puf_edge_server_cleanup(&server);
+    puf_trusted_authority_cleanup(&ta);
+
     printf("=== RLWE-PUF Enhanced Authentication Demo Completed ===\n");
 }
 

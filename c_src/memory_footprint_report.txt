@@ -1,0 +1,9 @@
+   text	   data	    bss	    dec	    hex	filename
+   4004	      0	      0	   4004	    fa4	main_puf_demo.o
+  13973	      0	      0	  13973	   3695	rlwe_puf_auth.o
+   2627	      0	      0	   2627	    a43	puf_optimized.o
+   9512	      0	      0	   9512	   2528	puf_timing_measured.o
+   1844	      0	      0	   1844	    734	rlwe_core.o
+   3054	      0	      0	   3054	    bee	ntt.o
+   4692	      0	      0	   4692	   1254	sha_portable.o
+  43273	    752	      8	  44033	   ac01	rlwe_puf_auth_demo

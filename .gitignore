@@ -2,6 +2,8 @@
 *.o
 *.a
 *.so
+*.su
+*.map
 rlwe_puf_auth_demo
 test_demo
 

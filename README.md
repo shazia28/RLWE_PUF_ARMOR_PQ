@@ -18,11 +18,11 @@ The proliferation of the Internet of Medical Things (IoMT) exposes medical devic
 
 ### Key Architectural Highlights
 - **Stateless Zero-NVM Trust:** Eliminates persistent non-volatile storage (Flash/EEPROM) of secret keys on IoMT nodes by combining silicon-rooted SRAM Physical Unclonable Functions (PUFs) with Ring-LWE (RLWE) cryptography. Private keys exist in volatile SRAM only during active protocol execution ($\approx 1.05$ ms).
-- **In-Place Harvey Butterfly NTT:** Stores precomputed twiddle factors strictly in Flash/ROM ($2.0$ KB), completely eliminating dynamic scratchpad buffers. Active polynomial memory is reduced to exactly $1.0$ KB ($n = 512, q = 12289$, 16-bit `int16_t` words). Total peak device SRAM is tightly bounded by $\approx 4.8$ KB.
+- **In-Place Harvey Butterfly NTT:** Stores precomputed twiddle factors strictly in Flash/ROM ($2.0$ KB), completely eliminating dynamic scratchpad buffers. Active polynomial memory is reduced to exactly $1.0$ KB ($n = 512, q = 12289$, 16-bit `int16_t` words), yielding **$2.8$ KB active cryptographic core state ($4.8$ KB total peak system SRAM)**.
 - **Bandwidth Efficiency:** Packed 14-bit coefficient encoding transmits the entire 3-round mutual authentication handshake in **$2{,}152$ bytes ($17{,}216$ bits)**, easily fitting within 9 standard Bluetooth Low Energy (BLE 5.0) packets.
-- **Peikert Error Reconciliation:** Replaces naive rounding with 1-bit cross-rounding hints ($w \in \{0,1\}^{512}$, $64$ bytes), guaranteeing robust shared key agreement under RLWE noise.
+- **Shift-Based Peikert Reconciliation & Key Confirmation:** Replaces naive rounding with 1-bit cross-rounding hints ($w \in \{0,1\}^{512}$, $64$ bytes) paired with all-or-nothing SHA-512 key confirmation, achieving **$97.74\%$** single-attempt key agreement (**$99.95\%$** with one automatic retry) and **zero** accepted mismatched keys across 10,000 Monte Carlo sessions.
 - **Noise-Resilient Fuzzy Extractor:** Employs an optimal $[15, 1, 15]$ repetition code with majority-logic decoding capable of tolerating bit-error rates (BER) up to $10\%$, ensuring whole-key recovery success rate $P_{\text{key}} \ge 99.14\%$.
-- **Triple-Tier Security Validation:** Formally proved under the Random Oracle Model (ROM), verified symbolically under the Dolev–Yao model using **ProVerif 2.05** (zero counterexamples), and concretely quantified with the **SageMath LWE Estimator** ($\approx 150$ bits post-quantum security, exceeding NIST Level 1).
+- **Triple-Tier Security Validation:** Formally proved under the Random Oracle Model (ROM), verified symbolically under the Dolev–Yao model using **ProVerif 2.05** (including explicit stolen-server-database modeling via `processCorruptServer`), and concretely quantified with the **SageMath LWE Estimator** ($\approx 150$ bits post-quantum security, exceeding NIST Level 1).
 - **Execution Efficiency:** Completes mutual authentication in **$0.785$ ms** ($784.994\ \mu\text{s}$) under pipelined execution ($1.306$ ms in full interactive cold-start mode) across the Raspberry Pi 400 (CPD) and Intel Xeon w3-2435 (Server) evaluation platforms.
 
 ---
@@ -99,11 +99,11 @@ proverif formal_verification/test_proverif.pv
 ```
 
 **Verified Properties:**
-- `query secret SK`: Session key secrecy (**Verified True**)
-- `query not attacker(v_i)`: Credential privacy (**Verified True**)
-- `inj-event(end_server) ==> inj-event(begin_device)`: Injective server authentication (**Verified True**)
-- `inj-event(end_device) ==> inj-event(begin_server)`: Injective device authentication (**Verified True**)
-- `query not attacker(devID)`: Device anonymity & untraceability (**Verified True**)
+- **P1** (`query attacker(uncorrupted_SK)`): Session-key secrecy under stolen server DB (**Verified True**)
+- **P2** (`query attacker(v_i)`): Stolen server DB exposure sanity check (**False — Expected: DB Leaked**)
+- **P3** (`inj-event(end_server) ==> inj-event(begin_device)`): Injective device-to-server authentication (**Verified True**)
+- **P4** (`inj-event(end_device) ==> inj-event(begin_server)`): Injective server-to-device authentication (**Verified True**)
+- **P5** (`query attacker(devID)`): Device privacy & anonymity (**Verified True**)
 
 The full verification log is available in [`formal_verification/proverif_output.txt`](formal_verification/proverif_output.txt).
 
@@ -123,7 +123,7 @@ The full verification log is available in [`formal_verification/proverif_output.
 | Packing Width | ⌈log₂ *q*⌉ | 14 bits | Over-the-air polynomial transmission (896 B / poly) |
 | Active Word Size | --- | 16 bits | In-memory `int16_t` runtime storage (1,024 B / poly) |
 | Total Communication | \|M₁\| + \|M₂\| + \|M₃\| | **2,152 bytes** | 1,064 B (M₁) + 1,024 B (M₂) + 64 B (M₃) |
-| Peak SRAM | --- | **≈ 4.8 KB** | 1,024 B NTT + 1,024 B *e_i* + 1,024 B *sk_i* + 512 B PUF + I/O |
+| Peak SRAM | --- | **2.8 KB active / 4.8 KB peak** | 2.8 KB active crypto core (1,024 B NTT + 1,024 B *e_i*/*sk_i* + 480 B helper + 80 B transient); 4.8 KB peak system SRAM incl. I/O & stack |
 | ROM Twiddle Tables | *M*_twiddle | **2.0 KB** | Flash-resident `const PROGMEM` constants |
 | PUF ECC | [*N*, *K*, *D*] | [15, 1, 15] | Repetition code with majority-logic decoding (*t* = 7) |
 | Pipelined Latency | *T*_CPD + *T*_S | **0.785 ms** | 699.024 µs (Raspberry Pi 400) + 85.970 µs (Intel Xeon w3-2435) |

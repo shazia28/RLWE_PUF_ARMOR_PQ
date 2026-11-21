@@ -1,7 +1,111 @@
-import numpy as np
 import hashlib
 import time
 import os
+import random
+
+try:
+    import numpy as np
+    HAS_NUMPY = True
+except ImportError:
+    HAS_NUMPY = False
+
+    class _CompatArray(list):
+        """Lightweight pure-Python polynomial/bit array wrapper when NumPy is unavailable."""
+        def __add__(self, other):
+            if isinstance(other, _CompatArray):
+                return _CompatArray([a + b for a, b in zip(self, other)])
+            return _CompatArray([a + other for a in self])
+        def __sub__(self, other):
+            if isinstance(other, _CompatArray):
+                return _CompatArray([a - b for a, b in zip(self, other)])
+            return _CompatArray([a - other for a in self])
+        def __mod__(self, m):
+            return _CompatArray([a % m for a in self])
+        def __xor__(self, other):
+            return _CompatArray([a ^ b for a, b in zip(self, other)])
+        def __gt__(self, v):
+            return _CompatArray([a > v for a in self])
+        def __ge__(self, v):
+            return _CompatArray([a >= v for a in self])
+        def __lt__(self, v):
+            return _CompatArray([a < v for a in self])
+        def __eq__(self, other):
+            if isinstance(other, (int, float)):
+                return _CompatArray([a == other for a in self])
+            return super().__eq__(other)
+        def astype(self, _dtype):
+            return _CompatArray([int(a) for a in self])
+        def tobytes(self):
+            return bytes(int(a) & 0xFF for a in self)
+
+    class _CompatRandom:
+        @staticmethod
+        def seed(s):
+            random.seed(s)
+        @staticmethod
+        def normal(mu, sig, size):
+            return _CompatArray([random.gauss(mu, sig) for _ in range(size)])
+        @staticmethod
+        def randint(low, high, size, dtype=None):
+            return _CompatArray([random.randrange(low, high) for _ in range(size)])
+        @staticmethod
+        def rand(size):
+            return _CompatArray([random.random() for _ in range(size)])
+
+    class np:
+        ndarray = _CompatArray
+        int64 = int
+        uint8 = int
+        random = _CompatRandom
+        @staticmethod
+        def round(arr):
+            return _CompatArray([int(round(x)) for x in arr])
+        @staticmethod
+        def zeros(size, dtype=None):
+            return _CompatArray([0] * size)
+        @staticmethod
+        def all(arr):
+            return all(bool(x) for x in arr)
+        @staticmethod
+        def any(arr):
+            return any(bool(x) for x in arr)
+        @staticmethod
+        def where(cond, x, y):
+            return _CompatArray([xv if c else yv for c, xv, yv in zip(cond, x, y)])
+        @staticmethod
+        def abs(arr):
+            return _CompatArray([abs(x) for x in arr])
+        @staticmethod
+        def max(arr):
+            return max(arr)
+        @staticmethod
+        def sum(arr):
+            return sum(arr)
+        @staticmethod
+        def frombuffer(buf, dtype=None):
+            return _CompatArray(list(buf))
+        @staticmethod
+        def unpackbits(arr):
+            bits = []
+            for b in arr:
+                for i in range(7, -1, -1):
+                    bits.append((b >> i) & 1)
+            return _CompatArray(bits)
+        @staticmethod
+        def packbits(bits):
+            out = []
+            for i in range(0, len(bits), 8):
+                byte = 0
+                for j in range(min(8, len(bits) - i)):
+                    byte |= (int(bits[i + j]) & 1) << (7 - j)
+                out.append(byte)
+            return _CompatArray(out)
+        @staticmethod
+        def repeat(arr, factor):
+            out = []
+            for x in arr:
+                out.extend([x] * factor)
+            return _CompatArray(out)
 
 # ==============================================================================
 # ARMOR-PQ: Post-Quantum Mutual Authentication and Authenticated Key Exchange
@@ -25,17 +129,73 @@ def hash_sha512(*args):
             m.update(str(arg).encode())
     return m.hexdigest()
 
+# Precomputed negacyclic NTT tables for pure-Python fallback (n=512, q=12289, psi=10302, omega=3)
+_PSI = 10302
+_PSI_INV = pow(_PSI, q - 2, q)
+_OMEGA = (_PSI * _PSI) % q
+_OMEGA_INV = pow(_OMEGA, q - 2, q)
+_N_INV = pow(n, q - 2, q)
+_PSI_POW = [pow(_PSI, i, q) for i in range(n)]
+_PSI_INV_POW = [pow(_PSI_INV, i, q) for i in range(n)]
+
+def _bit_rev9(x):
+    r = 0
+    for i in range(9):
+        if (x >> i) & 1:
+            r |= 1 << (8 - i)
+    return r
+
+def _fft_mod_q(arr, root):
+    a = [arr[_bit_rev9(i)] for i in range(n)]
+    length = 2
+    while length <= n:
+        half = length >> 1
+        w_len = pow(root, n // length, q)
+        for i in range(0, n, length):
+            w = 1
+            for j in range(half):
+                u = a[i + j]
+                v = (a[i + j + half] * w) % q
+                a[i + j] = (u + v) % q
+                a[i + j + half] = (u - v) % q
+                w = (w * w_len) % q
+        length <<= 1
+    return a
+
+def _ntt_py(a):
+    scaled = [(a[i] * _PSI_POW[i]) % q for i in range(n)]
+    return _fft_mod_q(scaled, _OMEGA)
+
+def _intt_py(a):
+    inv = _fft_mod_q(a, _OMEGA_INV)
+    return [(inv[i] * _PSI_INV_POW[i] * _N_INV) % q for i in range(n)]
+
 def poly_mul(a, b):
-    """Polynomial multiplication modulo (x^n + 1) and modulo q using FFT."""
-    from numpy.fft import fft, ifft
-    c = np.round(np.real(ifft(fft(a, 2 * n) * fft(b, 2 * n)))).astype(np.int64) % q
-    res = np.zeros(n, dtype=np.int64)
-    for i in range(len(c)):
-        if i < n:
-            res[i] = (res[i] + c[i]) % q
-        else:
-            res[i - n] = (res[i - n] - c[i]) % q
-    return res
+    """Polynomial multiplication modulo (x^n + 1) and modulo q using FFT/NTT."""
+    if HAS_NUMPY:
+        from numpy.fft import fft, ifft
+        c = np.round(np.real(ifft(fft(a, 2 * n) * fft(b, 2 * n)))).astype(np.int64) % q
+        res = np.zeros(n, dtype=np.int64)
+        for i in range(len(c)):
+            if i < n:
+                res[i] = (res[i] + c[i]) % q
+            else:
+                res[i - n] = (res[i - n] - c[i]) % q
+        return res
+    ntt_a = _ntt_py(a)
+    ntt_b = _ntt_py(b)
+    prod = [(x * y) % q for x, y in zip(ntt_a, ntt_b)]
+    return _CompatArray(_intt_py(prod))
+
+def derive_sk_from_puf(r_i_hex):
+    """Deterministically derives sk_i <- KDF(r_i, 'ARMOR-PQ-SK') in chi_sigma^n."""
+    seed_bytes = hashlib.sha256((r_i_hex + "ARMOR-PQ-SK").encode()).digest()
+    seed_int = int.from_bytes(seed_bytes[:4], "big")
+    rng = random.Random(seed_int)
+    vals = [int(round(rng.gauss(0, sigma))) % q for _ in range(n)]
+    if HAS_NUMPY:
+        return np.array(vals, dtype=np.int64)
+    return _CompatArray(vals)
 
 def sample_gaussian_error():
     """Discrete Gaussian error distribution chi_sigma with sigma=3.2."""
@@ -91,40 +251,36 @@ class FuzzyExtractor:
 def help_rec(sh_S, key_len=n):
     """
     Server generates Peikert reconciliation hint w and extracts key bits K_S.
-    Extracts key_len bits (default n=512 bits = 64 bytes matching Message M2).
+    Implements exact Peikert cross-rounding and shift-invariant key extraction:
+    w = round(4*v/q) mod 2
+    K_S = round(2/q * ((v - w*floor(q/4)) mod q)) mod 2
     """
     w = np.zeros(key_len, dtype=np.uint8)
     k_s = np.zeros(key_len, dtype=np.uint8)
     for i in range(key_len):
-        val = int(sh_S[i] % q)
-        if val < 0:
-            val += q
-        region = (val * 8) // q
-        w_bit = 1 if region in (1, 2, 5, 6) else 0
+        v = int(sh_S[i] % q)
+        if v < 0:
+            v += q
+        w_bit = int(round(4.0 * v / q)) % 2
         w[i] = w_bit
-        if w_bit == 0:
-            k = 1 if (q // 4 <= val <= (3 * q) // 4) else 0
-        else:
-            k = 0 if (0 <= val <= q // 2) else 1
-        k_s[i] = k
+        val = (v - w_bit * (q // 4)) % q
+        k_s[i] = 1 if (q // 4 <= val < (3 * q) // 4) else 0
     return w, k_s
 
 def rec(sh_D, w, key_len=n):
     """
     Device uses reconciliation hint w to recover exact key bits K_D.
-    Matches Peikert reconciliation function Rec(sh_D, w) across all n coefficients.
+    Matches Peikert reconciliation function Rec(sh_D, w) across all n coefficients:
+    K_D = round(2/q * ((u - w*floor(q/4)) mod q)) mod 2
     """
     k_d = np.zeros(key_len, dtype=np.uint8)
     for i in range(key_len):
-        val = int(sh_D[i] % q)
-        if val < 0:
-            val += q
+        u = int(sh_D[i] % q)
+        if u < 0:
+            u += q
         w_bit = w[i]
-        if w_bit == 0:
-            k = 1 if (q // 4 <= val <= (3 * q) // 4) else 0
-        else:
-            k = 0 if (0 <= val <= q // 2) else 1
-        k_d[i] = k
+        val = (u - w_bit * (q // 4)) % q
+        k_d[i] = 1 if (q // 4 <= val < (3 * q) // 4) else 0
     return k_d
 
 # ==============================================================================
@@ -149,9 +305,10 @@ def run_single_session(verbose=True):
     puf_raw = stm32_fingerprint * 15 # Tile to 480 bytes
     fe = FuzzyExtractor(key_len_bits=256, rep_factor=15)
     h_i, r_i = fe.generate(puf_raw) # r_i is the stable 256-bit derived key (hex)
-    sk_i = sample_gaussian_error() # Long-term secret key
+    sk_i = derive_sk_from_puf(r_i) # Deterministic long-term secret key sk_i <- KDF(r_i, "ARMOR-PQ-SK")
     e_sk = sample_gaussian_error()
     pk_i = (poly_mul(a, sk_i) + e_sk) % q # Long-term public key (in-place NTT)
+    del sk_i, e_sk # Zeroize sk_i and e_{pk,i} from volatile SRAM after enrollment
     PID_i = hash_sha512(device_id, r_i)[:32] # Anonymized pseudo-ID
 
     # TA credential issuance
@@ -182,14 +339,15 @@ def run_single_session(verbose=True):
     C_s = os.urandom(16).hex()
     T_s = int(time.time())
 
-    # PUF evaluation with ~10% bit flips
-    noisy_puf = bytearray(puf_raw)
-    for i in range(len(noisy_puf)):
-        if np.random.rand() < 0.10: # 10% BER
-            noisy_puf[i] ^= (1 << np.random.randint(0, 8))
+    # PUF evaluation with independent bit-level Bernoulli noise at target 10% BER (tau_BER = 0.10)
+    puf_bits = np.unpackbits(np.frombuffer(puf_raw, dtype=np.uint8))
+    noise_mask = (np.random.rand(len(puf_bits)) < 0.10).astype(np.uint8)
+    noisy_bits = puf_bits ^ noise_mask
+    noisy_puf = np.packbits(noisy_bits).tobytes()
             
     # Corrected via FE.Rep(r'_i, h_i) -> r_i using majority-logic decoding
-    r_prime_i = fe.reproduce(bytes(noisy_puf), h_i)
+    r_prime_i = fe.reproduce(noisy_puf, h_i)
+    sk_i = derive_sk_from_puf(r_prime_i) # Reconstruct sk_i <- KDF(r_i, "ARMOR-PQ-SK") in volatile SRAM
     
     if verbose:
         print(f"Original PUF derived key (r_i):      {r_i}")
@@ -225,11 +383,16 @@ def run_single_session(verbose=True):
         raise ValueError("Server Rejected: Nonce replay detected")
     if M1["PID_i"] not in server_db:
         raise ValueError("Server Rejected: Unknown pseudo-ID")
+    db_entry = server_db[M1["PID_i"]]
     if np.all(M1["p_tilde_i"] == 0) or np.any(M1["p_tilde_i"] >= q) or np.any(M1["p_tilde_i"] < 0):
         raise ValueError("Server Rejected: Invalid or zero ephemeral polynomial")
+    sum_poly = (M1["p_tilde_i"] + db_entry["pk_i"]) % q
+    centered_sum = np.where(sum_poly > q // 2, sum_poly - q, sum_poly)
+    ntt_slots = _ntt_py(sum_poly)
+    if np.all(sum_poly == 0) or np.max(np.abs(centered_sum)) <= int(6 * sigma) or any(s == 0 for s in ntt_slots):
+        raise ValueError("Server Rejected: Cancellation, near-cancellation, or zero-divisor attack detected")
 
     nonce_cache.add(M1["C_s"])
-    db_entry = server_db[M1["PID_i"]]
 
     # Ephemeral polynomial sampling at server
     e_j = sample_gaussian_error()
@@ -325,7 +488,12 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="ARMOR-PQ Mutual Authentication & Key Exchange Simulation")
     parser.add_argument("--runs", type=int, default=1000, help="Number of Monte Carlo trials to run (default: 1000)")
+    parser.add_argument("--seed", type=int, default=None, help="Random seed for deterministic reproducibility (e.g. 20261024)")
     args = parser.parse_args()
+
+    if args.seed is not None:
+        np.random.seed(args.seed)
+        print(f"Reproducibility seed set: {args.seed}")
 
     # 1. Run single detailed session
     run_single_session(verbose=True)
